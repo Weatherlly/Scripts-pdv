@@ -41,6 +41,19 @@ function passo7_voltar_grafico() {
     echo "Pressione Ctrl+D ou execute: startx"
 }
 
+function passo8_trava_permanente() {
+    echo "==> BLOQUEANDO escrita permanentemente (Imutável)..."
+    USUARIOS=$(ls /home)
+    for user in $USUARIOS; do
+        ARQUIVO="/home/$user/.xsession-errors"
+        # 1. Limpa o arquivo
+        sudo truncate -s 0 "$ARQUIVO" 2>/dev/null
+        # 2. Torna o arquivo imutável (+i). Nem o root escreve nele até tirar o atributo.
+        sudo chattr +i "$ARQUIVO" 2>/dev/null
+        echo "TRAVADO: $ARQUIVO agora é imutável e não crescerá mais."
+    done
+}
+
 while true; do
     echo ""
     echo "=== RESCUE PDV - Tela Preta (TTY) ==="
@@ -51,6 +64,7 @@ while true; do
     echo "5 - Maiores arquivos (du top 20)"
     echo "6 - Limpar logs .xsession-errors"
     echo "7 - Dicas voltar gráfico"
+    echo "8 - TRAVAR logs (Impedir crescimento futuro)"
     echo "0 - Sair"
     echo "====================================="
     read -p "Opção: " opt
@@ -63,9 +77,11 @@ while true; do
         5) passo5_maiores_arquivos ;;
         6) passo6_limpar_xsession ;;
         7) passo7_voltar_grafico ;;
+        8) passo8_trava_permanente ;;
         0) echo "Saindo..."; break ;;
         *) echo "Opção inválida!" ;;
     esac
     echo ""
     read -p "Enter para continuar..."
 done
+
