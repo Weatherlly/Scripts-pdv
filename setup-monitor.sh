@@ -7,7 +7,7 @@ RED='\033[0;31m'
 NC='\033[0m' # Sem cor
 
 echo -e "${BLUE}==========================================${NC}"
-echo -e "${BLUE}    INSTALADOR AUTOMÁTICO - MONITOR PDV   ${NC}"
+echo -e "${BLUE}    INSTALADOR AUTOMÁTICO - MONITOR PDV    ${NC}"
 echo -e "${BLUE}==========================================${NC}"
 
 show_menu() {
@@ -45,9 +45,21 @@ from flask_cors import CORS
 import psutil
 import socket
 import os
+import platform
+import subprocess
 
 app = Flask(__name__)
 CORS(app)
+
+def get_cpu_info():
+    try:
+        if platform.system() == "Linux":
+            command = "cat /proc/cpuinfo | grep 'model name' | uniq | cut -d':' -f2"
+            res = subprocess.check_output(command, shell=True).decode().strip()
+            return res if res else platform.processor()
+        return platform.processor()
+    except:
+        return "Processador Genérico"
 
 def get_cpu_temp():
     try:
@@ -56,22 +68,36 @@ def get_cpu_temp():
             return temps['coretemp'][0].current
         elif 'cpu_thermal' in temps:
             return temps['cpu_thermal'][0].current
-        return "N/A"
+        return 0
     except:
-        return "N/A"
+        return 0
 
 @app.route('/status')
 def get_status():
-    load1, load5, load15 = os.getloadavg()
+    try:
+        load1, _, _ = os.getloadavg()
+    except:
+        load1 = 0
+    
+    mem = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
+    
     return jsonify({
         "hostname": socket.gethostname(),
-        "cpu_percent": psutil.cpu_percent(interval=0.5),
+        "cpu_percent": psutil.cpu_percent(interval=0.1),
         "cpu_temp": get_cpu_temp(),
-        "memory_percent": psutil.virtual_memory().percent,
-        "disk_percent": psutil.disk_usage('/').percent,
+        "memory_percent": mem.percent,
+        "disk_percent": disk.percent,
         "load_avg": round(load1, 2),
         "uptime_days": int((psutil.time.time() - psutil.boot_time()) / 86400),
-        "status": "Online"
+        "status": "Online",
+        "hardware": {
+            "cpu_model": get_cpu_info(),
+            "cpu_cores": psutil.cpu_count(logical=False),
+            "ram_total": f"{round(mem.total / (1024**3), 2)} GB",
+            "disk_total": f"{round(disk.total / (1024**3), 2)} GB",
+            "so": f"{platform.system()} {platform.release()}"
+        }
     })
 
 if __name__ == '__main__':
