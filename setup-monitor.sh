@@ -7,28 +7,36 @@ RED='\033[0;31m'
 NC='\033[0m' # Sem cor
 
 echo -e "${BLUE}==========================================${NC}"
-echo -e "${BLUE}   INSTALADOR AUTOMÁTICO - MONITOR PDV    ${NC}"
+echo -e "${BLUE}    INSTALADOR AUTOMÁTICO - MONITOR PDV   ${NC}"
 echo -e "${BLUE}==========================================${NC}"
 
 show_menu() {
     echo -e "\n${GREEN}Selecione uma opção:${NC}"
     echo "1) Instalar tudo automaticamente (Recomendado)"
-    echo "2) Instalar dependências (Python, Flask, Psutil)"
-    echo "3) Criar e configurar o Agente Python"
+    echo "2) Instalar dependências e Liberar Firewall"
+    echo "3) Criar e configurar o Agente Python (Corrigido)"
     echo "4) Configurar e Ativar o Serviço Systemd"
     echo "q) Sair"
     echo -ne "\nOpção: "
 }
 
 install_dependencies() {
-    echo -e "\n${BLUE}[1/3] Instalando dependências do sistema...${NC}"
+    echo -e "\n${BLUE}[1/4] Instalando dependências e configurando Firewall...${NC}"
     sudo apt update
     sudo apt install -y python3 python3-pip
+    
+    # Instalação das libs Python
     sudo pip3 install flask flask-cors psutil --break-system-packages || sudo pip3 install flask flask-cors psutil
+    
+    # Liberação do Firewall
+    if command -v ufw > /dev/null; then
+        sudo ufw allow 5000/tcp
+        echo -e "${GREEN}Porta 5000 liberada no UFW.${NC}"
+    fi
 }
 
 create_agent() {
-    echo -e "\n${BLUE}[2/3] Criando o agente em /usr/local/bin/agente_monitor.py...${NC}"
+    echo -e "\n${BLUE}[2/4] Criando o agente em /usr/local/bin/agente_monitor.py...${NC}"
     
     cat <<EOF | sudo tee /usr/local/bin/agente_monitor.py > /dev/null
 #!/usr/bin/env python3
@@ -59,9 +67,9 @@ def get_status():
         "hostname": socket.gethostname(),
         "cpu_percent": psutil.cpu_percent(interval=0.5),
         "cpu_temp": get_cpu_temp(),
-        "memory_percent": psutil.memory_virtual_memory().percent,
+        "memory_percent": psutil.virtual_memory().percent,
         "disk_percent": psutil.disk_usage('/').percent,
-        "load_avg": load1,
+        "load_avg": round(load1, 2),
         "uptime_days": int((psutil.time.time() - psutil.boot_time()) / 86400),
         "status": "Online"
     })
@@ -75,7 +83,7 @@ EOF
 }
 
 setup_service() {
-    echo -e "\n${BLUE}[3/3] Configurando o serviço Systemd...${NC}"
+    echo -e "\n${BLUE}[3/4] Configurando o serviço Systemd...${NC}"
     
     cat <<EOF | sudo tee /etc/systemd/system/monitor-pdv.service > /dev/null
 [Unit]
@@ -93,7 +101,7 @@ EOF
 
     sudo systemctl daemon-reload
     sudo systemctl enable monitor-pdv
-    sudo systemctl start monitor-pdv
+    sudo systemctl restart monitor-pdv
     
     echo -e "${GREEN}Serviço ativado e rodando!${NC}"
 }
